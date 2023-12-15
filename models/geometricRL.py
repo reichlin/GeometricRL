@@ -1,14 +1,14 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from my_utils.model_utils import MLP, Policy, Memory, fill_up_actions
+from my_utils.model_utils import MLP, CNN, Policy, Memory, fill_up_actions
 import time
 from torch.distributions.uniform import Uniform
 
 
 class GeometricRL(nn.Module):
 
-    def __init__(self, dim_input, dim_goal, dim_z, dim_a, gamma, memory_size=0, all_actions_idx=None, all_actions=None, network_def=None, K=2, var=0.1, R_gamma=1., reg=1.0, policy_type=0, policy_clip=None, device=None):
+    def __init__(self, dim_input, dim_goal, dim_z, dim_a, gamma, memory_size=0, all_actions_idx=None, all_actions=None, network_def=None, K=2, var=0.1, R_gamma=1., reg=1.0, policy_type=0, policy_clip=None, device=None, use_images=0):
         super().__init__()
 
         self.replay_buffer = Memory(memory_size)
@@ -29,7 +29,11 @@ class GeometricRL(nn.Module):
 
         self.R_gamma = R_gamma
 
-        self.phi = MLP(dim_input, 0, dim_z, 3, residual=True)
+        self.use_images = use_images
+        if use_images == 0:
+            self.phi = MLP(dim_input, 0, dim_z, 3, residual=True)
+        else:
+            self.phi = CNN(4, 0, dim_z)
 
         self.policy_type = policy_type
         if policy_type == -1:
@@ -71,8 +75,11 @@ class GeometricRL(nn.Module):
         #goal = torch.cat([s_g, s[:, s_g.shape[1]:]], -1)
         # goal = s_g.repeat(1, 2)
         # goal[:, 2:] *= 0
-        goal = s * 0
-        goal[:, :s_g.shape[-1]] = s_g
+        if self.use_images == 0:
+            goal = s * 0
+            goal[:, :s_g.shape[-1]] = s_g
+        else:
+            goal = s_g
 
         z = self.phi(s)
         z_g = self.phi(goal)
@@ -99,22 +106,25 @@ class GeometricRL(nn.Module):
 
         return L_pos, L_neg
 
-    def train_actor(self, st, goal_t, st1, at):
+    def train_actor(self, st, gt, st1, at, ot=None, og=None, ot1=None):
 
         # TODO: get action space support and constrain policy to output mu in that range
 
         if self.policy_type == 0:
 
-            at = self.pi(st, goal_t)
+            at = self.pi(st, gt)
             s1_pred = self.T(st, at)
-            V_next = self.get_value(s1_pred, goal_t)
+            V_next = self.get_value(s1_pred, gt)
             tot_loss = - torch.mean(V_next)
 
 
         elif self.policy_type == 1:
-            log_prob, entropy = self.pi.get_log_prob(st, at, goal_t)
-            Vt = self.get_value(st, goal_t)
-            Vt1 = self.get_value(st1, goal_t)
+            state = st if ot is None else ot
+            next_state = st1 if ot1 is None else ot1
+            goal = gt if og is None else og
+            log_prob, entropy = self.pi.get_log_prob(st, at, gt)
+            Vt = self.get_value(state, goal)
+            Vt1 = self.get_value(next_state, goal)
             Adv = (Vt1 - Vt).detach() #  * self.gamma
             Adv_skew = Adv #(torch.exp( Adv * self.R_gamma)-1) #torch.clamp(Adv, -1, 1) # (torch.exp(  * self.R_gamma)-1) / 10.
             tot_loss = - torch.mean(Adv_skew * log_prob)
@@ -142,7 +152,7 @@ class GeometricRL(nn.Module):
             a_idx = np.array([x['a_idx'] for x in data])
             st1 = torch.cat([x['st1'] for x in data], 0)
         else:
-            st, gt, at, _, _, st1 = batch
+            st, gt, at, _, _, st1, ot, og, ot1 = batch
 
         L_pos, L_neg, L_trans, L_pi = None, None, None, None
         if self.policy_type == -1:
@@ -157,14 +167,17 @@ class GeometricRL(nn.Module):
             critic_loss.backward()
             self.opt_critic.step()
         else:
-            L_pos, L_neg = self.critic_loss(st, at, st1)
+            if self.use_images == 0:
+                L_pos, L_neg = self.critic_loss(st, at, st1)
+            else:
+                L_pos, L_neg = self.critic_loss(ot, at, ot1)
             critic_loss = L_pos + self.reg * L_neg
 
             self.opt_critic.zero_grad()
             critic_loss.backward()
             self.opt_critic.step()
 
-            L_pi = self.train_actor(st, gt, st1, at)
+            L_pi = self.train_actor(st, gt, st1, at, ot=ot, og=og, ot1=ot1)
 
         logs_losses = {'L_pos': L_pos.detach().cpu().item() if L_pos is not None else 0,
                        'L_neg': L_neg.detach().cpu().item() if L_neg is not None else 0,

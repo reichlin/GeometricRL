@@ -39,7 +39,7 @@ input_dim, goal_dim, a_dim = environment_details["state_dim"], environment_detai
 env_dense = gym.make(environment_details["gym_name"])#, render_mode='human')
 env_sparse = gym.make(environment_details["sim_name"])
 
-writer = SummaryWriter("./logs_PPO/" + environment_details["name"] + "r3")
+writer = SummaryWriter("./logs_PPO/" + environment_details["name"] + "r3_entropy=0.001")
 
 
 agent = PPO(input_dim+goal_dim, a_dim, 1, device)
@@ -63,7 +63,7 @@ for epoch in tqdm(range(EPOCHS)):
             if args.environment == 1:
                 reward_get_obj = - 0.1 * np.linalg.norm(next_obs['achieved_goal'] - next_obs['observation'][:3])
             training_reward += reward_get_obj
-            avg_distance_to_cube += - reward_get_obj
+            avg_distance_to_cube += np.linalg.norm(next_obs['achieved_goal'] - next_obs['observation'][:3])
             avg_distance_to_goal += - reward_to_goal
 
             done = terminated or truncated
@@ -115,6 +115,20 @@ writer.close()
 
 
 
+# env2 = gym.make(environment_details["gym_name"], render_mode='human')
+# for i in range(10):
+#     obs, _ = env2.reset()
+#     for t in range(50):
+#         env2.render()
+#         current_state = torch.from_numpy(np.expand_dims(np.concatenate((obs['observation'], obs['desired_goal']), -1), 0)).float().to(device)
+#
+#         at, logprob, sigma = agent.get_action(current_state)
+#         next_obs, reward_to_goal, terminated, truncated, info = env2.step(at[0].detach().cpu().numpy())
+#
+#         done = terminated or truncated
+#         obs = next_obs
+#         if done:
+#             break
 
 
 

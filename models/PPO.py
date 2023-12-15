@@ -45,7 +45,7 @@ class PPO:
         self.eps_clip = 0.2
         self.gamma = 0.9
         self.c1 = 1.  # VF loss coefficient
-        self.c2 = 0.01 # Entropy bonus coefficient [0.01 for fetch_Reach]
+        self.c2 = 0.001 #0.01 # Entropy bonus coefficient [0.01 for fetch_Reach]
         self.c2_schedule = 1.
         self.K_epochs = 5  # num epochs to train on batch data
         #self.epsilon = 0.9
@@ -66,6 +66,7 @@ class PPO:
             Updates the actor-critic networks for current batch data
         """
         rtgs = torch.tensor(calc_rtg(self.batchdata.rewards, self.batchdata.is_terminal, self.gamma)).float().to(self.device)
+        #rtgs /= torch.abs(torch.mean(rtgs))
 
         old_states = torch.cat([x for x in self.batchdata.states], 0).to(self.device)
         old_actions = torch.cat([x for x in self.batchdata.actions], 0).to(self.device)

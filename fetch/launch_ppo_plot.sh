@@ -1,8 +1,16 @@
 
 #! /bin/bash
 for expl in 1 5 10 15 20 25 30 35 40 45 50; do
-  for seed in 0 1 2; do #  1 2
+  for seed in 0 1 2 3 4; do #  1 2
     for env in 0; do #  2 4 5
+      # GeometricRL Images
+      for z_dim in 32 128 512; do
+        for reg in 1.0; do
+          for batch_size in 256; do
+            sbatch --export=expl=$expl,env=$env,alg=-1,bs=$batch_size,policy_type=1,z_dim=$z_dim,K=1,var=1.0,R_gamma=1.0,reg=$reg,pi_clip=-1,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
+          done
+        done
+      done
       # GeometricRL
       for z_dim in 32 128 512; do
         for reg in 1.0; do

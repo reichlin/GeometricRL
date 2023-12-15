@@ -240,32 +240,36 @@ class ActorCritic(nn.Module):
         return logprob, v, H
 
 
-# class CNN(nn.Module):
-#
-#     def __init__(self, channels, output_dim, use_pos_enc=0):
-#         super().__init__()
-#
-#         self.use_pos_enc = use_pos_enc
-#
-#         hidden = 64
-#         flat_dims = hidden * 5 * 5
-#         self.f = nn.Sequential(
-#             nn.Conv2d(channels, hidden, 3, stride=2, padding=0),
-#             nn.ReLU(),
-#             nn.Conv2d(hidden, hidden, 3, stride=2, padding=0),
-#             nn.ReLU(),
-#             nn.Conv2d(hidden, hidden, 3, stride=2, padding=0),
-#             nn.ReLU(),
-#             nn.Conv2d(hidden, hidden, 3, stride=2, padding=0),
-#             nn.ReLU(),
-#             nn.Flatten(),
-#             nn.Linear(flat_dims, hidden),
-#             nn.ReLU(),
-#             nn.Linear(hidden, output_dim)
-#         )
-#
-#     def forward(self, x):
-#         return self.f(x)
+class CNN(nn.Module):
+
+    def __init__(self, channels, cond_dim, output_dim):
+        super().__init__()
+
+        hidden = 64
+        flat_dims = hidden * 6 * 6
+        self.body = nn.Sequential(
+            nn.Conv2d(channels, hidden, 3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(hidden, hidden, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(hidden, hidden, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(hidden, hidden, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Flatten(),
+
+        )
+
+        self.head = nn.Sequential(
+            nn.Linear(flat_dims+cond_dim, hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, output_dim)
+        )
+
+    def forward(self, x, c=None):
+        h = self.body(x)
+        h = h if c is None else torch.cat([h, c], -1)
+        return self.head(h)
 #
 #
 # def test_render(model, device, max_T=300, sim_episodes=10):

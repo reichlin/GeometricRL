@@ -22,7 +22,8 @@ experiments = {0: {"name": "fetch_Reach", "gym_name": 'FetchReachDense-v2', "sim
                1: {"name": "fetch_Slide", "gym_name": 'FetchSlideDense-v2', "sim_name": 'FetchSlide-v2', "state_dim": 25, "goal_dim": 3, "action_dim": 4},
                2: {"name": "fetch_Push", "gym_name": 'FetchPushDense-v2', "sim_name": 'FetchPush-v2', "state_dim": 25, "goal_dim": 3, "action_dim": 4}}
 
-algorithms = {0: 'GeometricRL',
+algorithms = {-1: 'GeometricRL_Images',
+              0: 'GeometricRL',
               1: 'DDPG',
               2: 'BC',
               3: 'CQL',  # yes
@@ -44,8 +45,7 @@ parser.add_argument('--seed', default=0, type=int)
 ''' Dataset and Algorithm '''
 parser.add_argument('--exploration', default=15, type=int) # from 1 to 50
 parser.add_argument('--environment', default=0, type=int)
-parser.add_argument('--images', default=1, type=int)
-parser.add_argument('--algorithm', default=0, type=int)
+parser.add_argument('--algorithm', default=-1, type=int)
 
 ''' GeometricRL HyperParameters '''
 parser.add_argument('--policy_type', default=1, type=int)  # -1: PHI, 0:DDPG, 1: REINFORCE, 2: PPO
@@ -106,6 +106,7 @@ baseline_hyper = {'n_critics': args.n_critics, 'n_actions': args.n_actions, 'con
 
 algo_id = args.algorithm
 algo_name = algorithms[algo_id]
+use_images = 1 if algo_name == 'GeometricRL_Images' else 0
 
 exp_name = environment_details["name"] + "_R=-" + str(exploration_strategy)
 exp_name += "_" + algo_name + "_BS=" + str(batch_size)
@@ -124,22 +125,30 @@ env = gym.make(environment_details["sim_name"])
 
 file_name = "./datasets_var/" + environment_details["name"] + "/" + "R=-" + str(exploration_strategy) + ".npz"
 filenpz = np.load(file_name)
-states, images, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4'], filenpz['arr_5']
+states, images, images_goal, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4'], filenpz['arr_5'], filenpz['arr_6']
 
-if algo_id == 0 or algo_id == 10:
-    dataset = Dataset_Uniform_precollected(states, actions, rewards, terminations, next_states, device, batches_per_epoch*batch_size, input_dim)
+if algo_id == 0 or algo_id == 10 or algo_id == -1:
+    dataset = Dataset_Uniform_precollected(states, actions, rewards, terminations, next_states, device, batches_per_epoch*batch_size, input_dim, images=images, images_goal=images_goal)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 elif algo_id == 9:
-    dataset = Dataset_Visitation((states, actions, rewards, terminations, next_states), None, device, batches_per_epoch * batch_size, gamma, obs_shape=input_dim)
+    dataset = Dataset_Visitation((states, actions, rewards, terminations, next_states), None, device, batches_per_epoch * batch_size, gamma, obs_shape=input_dim, images=images, images_goal=images_goal)
     dataloader = DataLoader(dataset, batch_size=batch_size)
 else:
     dataset = d3rlpy.dataset.MDPDataset(states, actions, rewards, terminations)
     dataloader = None
 
 
+# model: decide if phi from images or from states
+# model: policy always from states? or from images as well?
+# training: augment batch definition
+
+# other datasets
+# contrastiveRL
+# d3rlpy: dataset with images, models with image backbone
+
 
 ''' Algorithm '''
-if algo_name == 'GeometricRL':
+if algo_name == 'GeometricRL' or algo_name == 'GeometricRL_Images':
     algo_class = None
     agent = GeometricRL(input_dim,
                         goal_dim,
@@ -153,20 +162,21 @@ if algo_name == 'GeometricRL':
                         reg=reg,
                         policy_type=policy_type,
                         policy_clip=pi_clip,
-                        device=device).to(device)
+                        device=device,
+                        use_images=use_images).to(device)
 
     train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type)
 
-elif algo_name == 'QuasiMetric':
-    algo_class = None
-    agent = QuasiMetric(input_dim, goal_dim, z_dim, a_dim, R_gamma, network_def, var, device).to(device)
-
-    train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type)
+# elif algo_name == 'QuasiMetric':
+#     algo_class = None
+#     agent = QuasiMetric(input_dim, goal_dim, z_dim, a_dim, R_gamma, network_def, var, device).to(device)
+#
+#     train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type)
 
 elif algo_name == 'ContrastiveRL':
     algo_class = None
     offline_reg = 0.05
-    agent = ContrastiveRL(input_dim, goal_dim, z_dim, a_dim, network_def, var, offline_reg, device).to(device)
+    agent = ContrastiveRL(input_dim, goal_dim, z_dim, a_dim, network_def, var, offline_reg, device, use_images=use_images).to(device)
 
     train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type)
 

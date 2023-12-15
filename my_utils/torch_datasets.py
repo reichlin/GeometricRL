@@ -8,7 +8,7 @@ from torch.distributions.geometric import Geometric
 
 class Dataset_Uniform_precollected(Dataset):
 
-    def __init__(self, states, actions, rewards, terminations, next_states, device, size, obs_shape):
+    def __init__(self, states, actions, rewards, terminations, next_states, device, size, obs_shape, images=None, images_goal=None):
 
         self.device = device
 
@@ -19,11 +19,26 @@ class Dataset_Uniform_precollected(Dataset):
         '''
 
         self.states = torch.from_numpy(states).float()[:, :obs_shape].to(self.device)
-        # if images is not None:
-        #     self.images = torch.from_numpy(images).float().to(self.device)
-        # else:
-        #     self.images = None
+        if images is not None:
+            self.images = torch.from_numpy(images).float().to(self.device)
+            self.images_goal = torch.from_numpy(images_goal).float().to(self.device)
+        else:
+            self.images = None
+            self.images_goal = None
         self.goals = torch.from_numpy(states).float()[:, obs_shape:].to(self.device)
+
+        # goals = states[:, obs_shape:]
+        # goal_idx = np.zeros(states.shape[0])
+        # for i in tqdm(range(states.shape[0])):
+        #     min_d = 10000
+        #     idx = -1
+        #     for j in range(states.shape[0]):
+        #         d_j = np.linalg.norm(goals[i] - states[j, :goals.shape[-1]])
+        #         if np.linalg.norm(states[i, obs_shape:] - states[j, obs_shape:]) < 0.02:
+        #             if min_d > d_j:
+        #                 min_d = d_j
+        #                 idx = j
+        #     goal_idx[i] = idx
 
         # goals = states[:, obs_shape:]
         # self.goals = self.states * 0
@@ -46,14 +61,20 @@ class Dataset_Uniform_precollected(Dataset):
         idx = np.random.randint(0, self.len)
 
         s = self.states[idx]#.to(self.device)
-        # o = self.images[idx] if self.images is not None else None
+        o = self.images[idx] if self.images is not None else None
+        og = self.images_goal[idx] if self.images_goal is not None else None
         g = self.goals[idx]#.to(self.device)
         a = self.actions[idx]#.to(self.device)
         r = self.rewards[idx]#.to(self.device)
         term = self.terminations[idx]#.to(self.device)
         s1 = self.next_states[idx]#.to(self.device)
 
-        return s, g, a, r, term, s1
+        if term == 0:
+            o1 = self.images[idx + 1] if self.images is not None else None
+        else:
+            o1 = self.images[idx] if self.images is not None else None
+
+        return s, g, a, r, term, s1, o, og, o1
 
 
 class Dataset_Minari(Dataset):
@@ -125,7 +146,7 @@ class Dataset_Minari(Dataset):
 
 class Dataset_Visitation(Dataset):
 
-    def __init__(self, dataset_tuple, offline_dataset, device, size, gamma, obs_shape=0, include_achiev_goal=False):
+    def __init__(self, dataset_tuple, offline_dataset, device, size, gamma, obs_shape=0, include_achiev_goal=False, images=None, images_goal=None):
 
 
         self.device = device
@@ -136,13 +157,20 @@ class Dataset_Visitation(Dataset):
 
             trj_idx = np.nonzero(terminations[:, 0])[0]
             i = 0
-            self.states, self.goals, self.actions, self.rewards, self.terminations, self.next_states = [], [], [], [], [], []
+            self.states, self.goals, self.actions, self.rewards, self.terminations, self.next_states, self.images, self.images_goal = [], [], [], [], [], [], [], []
             for j in trj_idx:
                 self.states.append(torch.from_numpy(states[i:j, :obs_shape]).float().to(self.device))
                 self.goals.append(torch.from_numpy(states[i:j, obs_shape:]).float().to(self.device))
                 # goal_states = states[i:j, :obs_shape] * 0
                 # goal_states[:, :-obs_shape] = states[i:j, obs_shape:]
                 # self.goals.append(torch.from_numpy(goal_states).float().to(self.device))
+
+                if images is not None:
+                    self.images.append(torch.from_numpy(images[i:j]).float().to(self.device))
+                    self.images_goal.append(torch.from_numpy(images_goal[i:j]).float().to(self.device))
+                else:
+                    self.images = None
+                    self.images_goal = None
 
                 self.actions.append(torch.from_numpy(actions[i:j]).float().to(self.device))
                 self.rewards.append(torch.from_numpy(rewards[i:j]).float().to(self.device))
@@ -202,13 +230,20 @@ class Dataset_Visitation(Dataset):
         i = np.random.randint(0, len_trj-t)
 
         s = self.states[trj_i][i]
+        o = self.images[trj_i][i] if self.images is not None else None
+        og = self.images_goal[trj_i][i] if self.images_goal is not None else None
         g = self.goals[trj_i][i]
         a = self.actions[trj_i][i]
         r = self.rewards[trj_i][i]
         term = self.terminations[trj_i][i]
         s1 = self.next_states[trj_i][i+t]
 
-        return s, g, a, r, term, s1
+        if term == 0:
+            o1 = self.images[trj_i][i+t] if self.images is not None else None
+        else:
+            o1 = self.images[trj_i][i] if self.images is not None else None
+
+        return s, g, a, r, term, s1, o, og, o1
 
 
 
