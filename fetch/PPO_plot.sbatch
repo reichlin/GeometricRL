@@ -2,7 +2,7 @@
 #SBATCH --mem=32GB
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=2
-#SBATCH --constrain='balrog|eowyn|khazadum|rivendell|arwen|gondor'
+#SBATCH --constrain='balrog|eowyn|khazadum|rivendell|arwen|gondor|galadriel'
 
 #balrog|rivendell|galadriel galadriel|arwen|gondor|belegost
 
@@ -11,7 +11,7 @@ conda activate offlineRL
 
 export PYTHONPATH=$PYTHONPATH:/Midgard/home/areichlin/GeometricRL
 
-python3 /Midgard/home/areichlin/GeometricRL/Fetch/fetch_main.py \
+python3 /Midgard/home/areichlin/GeometricRL/fetch/fetch_main.py \
  --exploration ${expl} \
   --environment ${env} \
    --algorithm ${alg} \

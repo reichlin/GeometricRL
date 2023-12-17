@@ -45,7 +45,7 @@ parser.add_argument('--seed', default=0, type=int)
 ''' Dataset and Algorithm '''
 parser.add_argument('--exploration', default=15, type=int) # from 1 to 50
 parser.add_argument('--environment', default=0, type=int)
-parser.add_argument('--algorithm', default=-1, type=int)
+parser.add_argument('--algorithm', default=0, type=int)
 
 ''' GeometricRL HyperParameters '''
 parser.add_argument('--policy_type', default=1, type=int)  # -1: PHI, 0:DDPG, 1: REINFORCE, 2: PPO

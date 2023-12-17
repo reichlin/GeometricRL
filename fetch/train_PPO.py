@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--seed', default=0, type=int)
 
-parser.add_argument('--environment', default=1, type=int)
+parser.add_argument('--environment', default=2, type=int)
 
 args = parser.parse_args()
 
@@ -39,7 +39,7 @@ input_dim, goal_dim, a_dim = environment_details["state_dim"], environment_detai
 env_dense = gym.make(environment_details["gym_name"])#, render_mode='human')
 env_sparse = gym.make(environment_details["sim_name"])
 
-writer = SummaryWriter("./logs_PPO/" + environment_details["name"] + "r3_entropy=0.001")
+writer = SummaryWriter("./logs_PPO/" + environment_details["name"] + "r=0.1_entropy=0.01_schedule=1.0")
 
 
 agent = PPO(input_dim+goal_dim, a_dim, 1, device)
@@ -60,7 +60,7 @@ for epoch in tqdm(range(EPOCHS)):
 
             training_reward = reward_to_goal
             reward_get_obj = 0
-            if args.environment == 1:
+            if args.environment == 1 or args.environment == 2:
                 reward_get_obj = - 0.1 * np.linalg.norm(next_obs['achieved_goal'] - next_obs['observation'][:3])
             training_reward += reward_get_obj
             avg_distance_to_cube += np.linalg.norm(next_obs['achieved_goal'] - next_obs['observation'][:3])

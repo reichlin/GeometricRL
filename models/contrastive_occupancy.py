@@ -50,7 +50,7 @@ class ContrastiveRL(nn.Module):
 
         # TODO: get action space support and constrain policy to output mu in that range
 
-        state = st if ot is None else ot
+        state = st if self.use_images == 0 else ot
         if self.use_images == 0:
             goal = st * 0
             goal[:, :goal_t.shape[-1]] = goal_t

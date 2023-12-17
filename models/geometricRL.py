@@ -119,9 +119,9 @@ class GeometricRL(nn.Module):
 
 
         elif self.policy_type == 1:
-            state = st if ot is None else ot
-            next_state = st1 if ot1 is None else ot1
-            goal = gt if og is None else og
+            state = st if self.use_images == 0 else ot
+            next_state = st1 if self.use_images == 0 else ot1
+            goal = gt if self.use_images == 0 else og
             log_prob, entropy = self.pi.get_log_prob(st, at, gt)
             Vt = self.get_value(state, goal)
             Vt1 = self.get_value(next_state, goal)

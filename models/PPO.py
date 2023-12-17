@@ -45,7 +45,7 @@ class PPO:
         self.eps_clip = 0.2
         self.gamma = 0.9
         self.c1 = 1.  # VF loss coefficient
-        self.c2 = 0.001 #0.01 # Entropy bonus coefficient [0.01 for fetch_Reach]
+        self.c2 = 0.01 #0.01 # Entropy bonus coefficient [0.01 for fetch_Reach]
         self.c2_schedule = 1.
         self.K_epochs = 5  # num epochs to train on batch data
         #self.epsilon = 0.9
