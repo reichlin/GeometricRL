@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 experiments = {0: {"name": "fetch_Reach", "gym_name": 'FetchReachDense-v2', "sim_name": 'FetchReach-v2', "state_dim": 10, "goal_dim": 3, "action_dim": 4},
                1: {"name": "fetch_PickandPlace", "gym_name": 'FetchPickAndPlaceDense-v2', "sim_name": 'FetchPickAndPlace-v2', "state_dim": 25, "goal_dim": 3, "action_dim": 4}}
 
-algorithms = {0: 'GeometricRL',
+algorithms = {-1: 'GeometricRL_Images',
+              0: 'GeometricRL',
               1: 'DDPG',
               2: 'BC',
               3: 'CQL',  # yes
@@ -35,19 +36,19 @@ hypers = {1: {'n_critics': 2, 'n_actions': 1, 'conservative_weight': 10.0, 'expe
 
 environment = 0  # 0, 1, 2, 3, 4, 5
 
-all_results_sparse = np.ones((11, 9, 3, 100)) * -51
-all_results_dense = np.ones((11, 9, 3, 100)) * -51# env, expl, algo, seed, time
+all_results_sparse = np.ones((11, 10, 5, 100)) * -51
+all_results_dense = np.ones((11, 10, 5, 100)) * -51# env, expl, algo, seed, time
 
 for i, exploration in enumerate([50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1]):
-    for j, algo_id in enumerate([0, 1, 2, 3, 4, 5, 7, 8, 9]):
-        for k, seed in enumerate([0, 1, 2]):
+    for j, algo_id in enumerate([-1, 0, 1, 2, 3, 4, 5, 7, 8, 9]):
+        for k, seed in enumerate([0, 1, 2, 3, 4]):
 
             algo_name = algorithms[algo_id]
             environment_details = experiments[environment]
 
-            if algo_id == 0:
-                tmp_res_s = np.ones((3, 100)) * -51
-                tmp_res_d = np.ones((3, 100)) * -51
+            if algo_id < 1:
+                tmp_res_s = np.ones((5, 100)) * -51
+                tmp_res_d = np.ones((5, 100)) * -51
                 for z_id, z_dim in enumerate([32, 128, 512]):
                     exp_name = environment_details["name"] + "_R=-" + str(exploration)
                     exp_name += "_" + algo_name + "_BS=" + str(batch_size)
@@ -62,8 +63,8 @@ for i, exploration in enumerate([50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1]):
                 all_results_sparse[i, j, k] = tmp_res_s[np.argmax(np.max(tmp_res_s, -1))]
                 all_results_dense[i, j, k] = tmp_res_d[np.argmax(np.max(tmp_res_s, -1))]
             elif algo_id == 3:
-                tmp_res_s = np.ones((3, 100)) * -51
-                tmp_res_d = np.ones((3, 100)) * -51
+                tmp_res_s = np.ones((5, 100)) * -51
+                tmp_res_d = np.ones((5, 100)) * -51
                 for w_id, c_w in enumerate([1.0, 10.0]):
                     exp_name = environment_details["name"] + "_R=-" + str(exploration)
                     exp_name += "_" + algo_name + "_BS=" + str(batch_size)
@@ -78,8 +79,8 @@ for i, exploration in enumerate([50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1]):
                 all_results_sparse[i, j, k] = tmp_res_s[np.argmax(np.max(tmp_res_s, -1))]
                 all_results_dense[i, j, k] = tmp_res_d[np.argmax(np.max(tmp_res_s, -1))]
             elif algo_id == 8:
-                tmp_res_s = np.ones((3, 100)) * -51
-                tmp_res_d = np.ones((3, 100)) * -51
+                tmp_res_s = np.ones((5, 100)) * -51
+                tmp_res_d = np.ones((5, 100)) * -51
                 for ex_id, exp in enumerate([0.7, 0.9]):
                     exp_name = environment_details["name"] + "_R=-" + str(exploration)
                     exp_name += "_" + algo_name + "_BS=" + str(batch_size)
@@ -107,9 +108,13 @@ for i, exploration in enumerate([50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1]):
 
 print()
 
-for j, algo_id in enumerate([0, 1, 2, 3, 4, 5, 7, 8, 9]):
-    plt.plot(np.array([-50, -45, -40, -35, -30, -25, -20, -15, -10, -5, -1]), np.max(all_results_sparse[:, j, 0], -1), label=algorithms[algo_id])
+for j, algo_id in enumerate([-1, 0, 1, 2, 3, 4, 5, 7, 8, 9]):
+    mu = np.mean(np.max(all_results_sparse[:, j, :], -1), -1)
+    std = np.std(np.max(all_results_sparse[:, j, :], -1), -1)
+    plt.plot(np.array([-50, -45, -40, -35, -30, -25, -20, -15, -10, -5, -1]), mu, label=algorithms[algo_id])
+    plt.fill_between(np.array([-50, -45, -40, -35, -30, -25, -20, -15, -10, -5, -1]), mu-std, mu+std, alpha=0.2)
 plt.legend()
+plt.title("fetch Reach")
 plt.show()
 
 print()

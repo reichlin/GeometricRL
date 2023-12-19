@@ -19,20 +19,34 @@ class ContrastiveRL(nn.Module):
         if use_images == 0:
             self.phi = MLP(input_dim, a_dim, z_dim, 3, residual=True)
             self.psi = MLP(input_dim, 0, z_dim, 3, residual=True)
+
+            self.pi = Policy(input_dim, goal_dim, a_dim, network_def, var)
+
+            critic_params = list(self.phi.parameters()) + list(self.psi.parameters())
+            self.opt_critic = torch.optim.Adam(critic_params, lr=1e-3)
+
+            self.opt_actor = torch.optim.Adam(self.pi.parameters(), lr=1e-3)
         else:
             self.phi = CNN(4, a_dim, z_dim)
             self.psi = CNN(4, 0, z_dim)
 
-        self.pi = Policy(input_dim, goal_dim, a_dim, network_def, var)
+            self.pi_encoder = CNN(4, 0, z_dim)
+            self.pi = Policy(z_dim, 0, a_dim, network_def, var)
 
-        critic_params = list(self.phi.parameters()) + list(self.psi.parameters())
-        self.opt_critic = torch.optim.Adam(critic_params, lr=1e-3)
+            critic_params = list(self.phi.parameters()) + list(self.psi.parameters())
+            self.opt_critic = torch.optim.Adam(critic_params, lr=1e-3)
 
-        self.opt_actor = torch.optim.Adam(self.pi.parameters(), lr=1e-3)
+            self.opt_actor = torch.optim.Adam(list(self.pi_encoder.parameters()) + list(self.pi.parameters()), lr=1e-3)
+
+
 
     def predict(self, s):
-        st = torch.from_numpy(s[:, :self.dim_input]).float().to(self.device)
-        gt = torch.from_numpy(s[:, self.dim_input:]).float().to(self.device)
+        if self.use_images == 0:
+            st = torch.from_numpy(s[:, :self.dim_input]).float().to(self.device)
+            gt = torch.from_numpy(s[:, self.dim_input:]).float().to(self.device)
+        else:
+            st = self.pi_encoder(torch.from_numpy(s).float().to(self.device))
+            gt = None
         mu = self.pi.get_mean(st, gt)
         return torch.squeeze(mu).detach().cpu().numpy()
 
@@ -55,7 +69,9 @@ class ContrastiveRL(nn.Module):
             goal = st * 0
             goal[:, :goal_t.shape[-1]] = goal_t
         else:
+            st = self.pi_encoder(ot)
             goal = og
+            goal_t = None
 
         a = self.pi.sample_action(st, goal_t)
         z_sa = self.phi(state, a)

@@ -32,17 +32,24 @@ class GeometricRL(nn.Module):
         self.use_images = use_images
         if use_images == 0:
             self.phi = MLP(dim_input, 0, dim_z, 3, residual=True)
+            self.policy_type = policy_type
+            if policy_type == -1:
+                self.T = MLP(dim_input, dim_a, dim_input, 2)  # dim_input +
+                critic_params = list(self.phi.parameters()) + list(self.T.parameters())
+            else:
+                critic_params = self.phi.parameters()
+                self.pi = Policy(dim_input, dim_goal, dim_a, network_def, var)
+                self.opt_actor = torch.optim.Adam(self.pi.parameters(), lr=1e-3)
         else:
             self.phi = CNN(4, 0, dim_z)
+            self.policy_type = policy_type
 
-        self.policy_type = policy_type
-        if policy_type == -1:
-            self.T = MLP(dim_input, dim_a, dim_input, 2) # dim_input +
-            critic_params = list(self.phi.parameters()) + list(self.T.parameters())
-        else:
             critic_params = self.phi.parameters()
-            self.pi = Policy(dim_input, dim_goal, dim_a, network_def, var)
-            self.opt_actor = torch.optim.Adam(self.pi.parameters(), lr=1e-3)
+            self.pi_encoder = CNN(4, 0, dim_z)
+            self.pi = Policy(dim_z, 0, dim_a, network_def, var)
+            self.opt_actor = torch.optim.Adam(list(self.pi_encoder.parameters()) + list(self.pi.parameters()), lr=1e-3)
+
+
 
         self.opt_critic = torch.optim.Adam(critic_params, lr=1e-3)
 
@@ -52,8 +59,13 @@ class GeometricRL(nn.Module):
         return dist
 
     def predict(self, s):
-        st = torch.from_numpy(s[:, :self.dim_input]).float().to(self.device)
-        gt = torch.from_numpy(s[:, self.dim_input:]).float().to(self.device)
+        if self.use_images == 0:
+            st = torch.from_numpy(s[:, :self.dim_input]).float().to(self.device)
+            gt = torch.from_numpy(s[:, self.dim_input:]).float().to(self.device)
+        else:
+            st = self.pi_encoder(torch.from_numpy(s).float().to(self.device))
+            gt = None
+
         if self.policy_type == 0:
             mu = self.pi(st, gt)
         else:
@@ -122,6 +134,9 @@ class GeometricRL(nn.Module):
             state = st if self.use_images == 0 else ot
             next_state = st1 if self.use_images == 0 else ot1
             goal = gt if self.use_images == 0 else og
+            if self.use_images == 1:
+                st = self.pi_encoder(ot)
+                gt = None
             log_prob, entropy = self.pi.get_log_prob(st, at, gt)
             Vt = self.get_value(state, goal)
             Vt1 = self.get_value(next_state, goal)

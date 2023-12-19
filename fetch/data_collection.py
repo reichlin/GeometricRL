@@ -13,13 +13,14 @@ from models.PPO import PPO
 
 # name Minari, name Gym, state space dim, goal space dim, action space dim
 experiments = {0: {"name": "fetch_Reach", "gym_name": 'FetchReachDense-v2', "sim_name": 'FetchReach-v2', "state_dim": 10, "goal_dim": 3, "action_dim": 4},
-               1: {"name": "fetch_PickandPlace", "gym_name": 'FetchPickAndPlaceDense-v2', "sim_name": 'FetchPickAndPlace-v2', "state_dim": 25, "goal_dim": 3, "action_dim": 4}}
+               1: {"name": "fetch_PickandPlace", "gym_name": 'FetchPickAndPlaceDense-v2', "sim_name": 'FetchPickAndPlace-v2', "state_dim": 25, "goal_dim": 3, "action_dim": 4},
+               2: {"name": "fetch_Push", "gym_name": 'FetchPushDense-v2', "sim_name": 'FetchPush-v2', "state_dim": 25, "goal_dim": 3, "action_dim": 4}}
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--seed', default=0, type=int)
 
-parser.add_argument('--environment', default=0, type=int)
+parser.add_argument('--environment', default=2, type=int)
 parser.add_argument('--reward', default=50, type=int)
 
 args = parser.parse_args()
@@ -42,14 +43,14 @@ env_sparse = gym.make(environment_details["sim_name"], render_mode='rgb_array', 
 agent = PPO(input_dim+goal_dim, a_dim, 1, device)
 
 agent_optimal = PPO(input_dim+goal_dim, a_dim, 1, device)
-reward_achieved = "-" + str(1)
+reward_achieved = "-" + str(20)
 path_dir = "./saved_PPOs/" + environment_details["name"] + "/"
 exp_name = "R=" + reward_achieved
 agent_optimal.load_model(path_dir, exp_name)
 
 reward = args.reward
 
-for reward in [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]: #range(1, 51):
+for reward in [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]: #range(1, 51):
     print(reward, end=" ")
 
     reward_achieved = "-"+str(reward)
@@ -82,7 +83,7 @@ for reward in [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]: #range(1, 51):
             ot = env_sparse.render()
             st = np.expand_dims(np.concatenate((obs['observation'], obs['desired_goal']), -1), 0)
 
-            at, logprob, sigma = agent.get_action(torch.from_numpy(st).float().to(device), test=False)  # TODO test=True ???
+            at, logprob, sigma = agent.get_action(torch.from_numpy(st).float().to(device), test=True)  # TODO test=True ???
             next_obs, reward_to_goal, terminated, truncated, info = env_sparse.step(at[0].detach().cpu().numpy())
 
             done = terminated or truncated
@@ -142,21 +143,31 @@ for reward in [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]: #range(1, 51):
             terminations = np.concatenate((terminations, np.concatenate(tmp_terminations, 0)), 0)
             next_states = np.concatenate((next_states, np.concatenate(tmp_next_states, 0)), 0)
 
-    file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
+    file_name = "./datasets/" + environment_details["name"] + "/" + exp_name + ".npz"
     np.savez(file_name, states, images, images_goal, actions, rewards, terminations, next_states)
 
 
+# tot_rewards = []
+# for reward in range(50, 0, -1):
+#     exp_name = "R=-"+str(reward)
+#     file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
+#     filenpz = np.load(file_name)
+#     states, images, images_goal, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4'], filenpz['arr_5'], filenpz['arr_6']
+#     tot_rewards.append(np.sum(rewards > -0.5))
+# plt.plot(range(1, 51), tot_rewards)
+# plt.show()
+
 tot_rewards = []
-for reward in range(50, 0, -1):
+for reward in [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]:
     exp_name = "R=-"+str(reward)
-    file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
+    file_name = "./datasets/" + environment_details["name"] + "/" + exp_name + ".npz"
     filenpz = np.load(file_name)
     states, images, images_goal, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4'], filenpz['arr_5'], filenpz['arr_6']
-    tot_rewards.append(np.sum(rewards > -0.5))
-plt.plot(range(1, 51), tot_rewards)
+    tot_rewards.append(np.sum(rewards > -0.5)/100)
+plt.plot([35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50], tot_rewards)
 plt.show()
 
-
+print()
 
 
 

@@ -1,46 +1,38 @@
 
 #! /bin/bash
-for expl in 5 10 15 20 25 30 35 40 45 50; do # TODO: 1 5 10 15 20 25 30 35 40 45 50
-  for seed in 0 1 2 3 4; do #  1 2
+for seed in 0 1 2; do #  1 2
+  for expl in 1 10 20 30 40 50; do # TODO: 1 5 10 15 20 25 30 35 40 45 50
     for env in 0; do #  2 4 5
-#      # GeometricRL Images
-#      for z_dim in 32 128 512; do
-#        for reg in 1.0; do
-#          for batch_size in 256; do
-#            sbatch --export=expl=$expl,env=$env,alg=-1,bs=$batch_size,policy_type=1,z_dim=$z_dim,K=1,var=1.0,R_gamma=1.0,reg=$reg,pi_clip=-1,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
-#          done
-#        done
-#      done
-#      # GeometricRL
-#      for z_dim in 32 128 512; do
-#        for reg in 1.0; do
-#          for batch_size in 256; do
-#            sbatch --export=expl=$expl,env=$env,alg=0,bs=$batch_size,policy_type=1,z_dim=$z_dim,K=1,var=1.0,R_gamma=1.0,reg=$reg,pi_clip=-1,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
-#          done
-#        done
-#      done
-      # DDPG
-      for n_c in 2; do
-        sbatch --export=expl=$expl,env=$env,bs=256,alg=1,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
+      # GeometricRL
+      for z_dim in 32 128 512; do
+        for reg in 1.0; do
+          for batch_size in 256; do
+            sbatch --export=expl=$expl,env=$env,alg=0,bs=$batch_size,policy_type=1,z_dim=$z_dim,K=1,var=1.0,R_gamma=1.0,reg=$reg,pi_clip=-1,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed,use_images=1  PPO_plot.sbatch
+          done
+        done
       done
-      # BC
-      sbatch --export=expl=$expl,env=$env,bs=256,alg=2,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
+#      # DDPG
+#      for n_c in 2; do
+#        sbatch --export=expl=$expl,env=$env,bs=256,alg=1,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed,use_images=1  PPO_plot.sbatch
+#      done
+#      # BC
+#      sbatch --export=expl=$expl,env=$env,bs=256,alg=2,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed,use_images=1  PPO_plot.sbatch
       # CQL
-      for n_a in 10; do
+      for n_a in 2; do
         for c_wei in 1.0 10.0; do
-          sbatch --export=expl=$expl,env=$env,bs=256,alg=3,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=1,n_a=$n_a,c_wei=$c_wei,expectile=0.9,seed=$seed PPO_plot.sbatch
+          sbatch --export=expl=$expl,env=$env,bs=256,alg=3,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=1,n_a=$n_a,c_wei=$c_wei,expectile=0.9,seed=$seed,use_images=1  PPO_plot.sbatch
         done
       done
       # BCQ
       for n_c in 2; do
-        for n_a in 10; do
-          sbatch --export=expl=$expl,env=$env,bs=256,alg=4,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=$n_a,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
+        for n_a in 2; do
+          sbatch --export=expl=$expl,env=$env,bs=256,alg=4,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=$n_a,c_wei=10.0,expectile=0.9,seed=$seed,use_images=1  PPO_plot.sbatch
         done
       done
       # BEAR
       for n_c in 2; do
-        for n_a in 10; do
-          sbatch --export=expl=$expl,env=$env,bs=256,alg=5,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=$n_a,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
+        for n_a in 2; do
+          sbatch --export=expl=$expl,env=$env,bs=256,alg=5,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=$n_a,c_wei=10.0,expectile=0.9,seed=$seed,use_images=1  PPO_plot.sbatch
         done
       done
 #      # AWAC
@@ -51,19 +43,19 @@ for expl in 5 10 15 20 25 30 35 40 45 50; do # TODO: 1 5 10 15 20 25 30 35 40 45
 #      done
       # PLAS
       for n_c in 2; do
-        sbatch --export=expl=$expl,env=$env,bs=256,alg=7,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
+        sbatch --export=expl=$expl,env=$env,bs=256,alg=7,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed,use_images=1  PPO_plot.sbatch
       done
       # IQL
       for n_c in 2; do
         for expectile in 0.7 0.9; do
-          sbatch --export=expl=$expl,env=$env,bs=256,alg=8,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=1,c_wei=10.0,expectile=$expectile,seed=$seed PPO_plot.sbatch
+          sbatch --export=expl=$expl,env=$env,bs=256,alg=8,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=1,c_wei=10.0,expectile=$expectile,seed=$seed,use_images=1  PPO_plot.sbatch
         done
       done
       # ContrastiveRL
-      sbatch --export=expl=$expl,env=$env,bs=256,alg=9,policy_type=1,z_dim=128,K=1,var=1.0,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed PPO_plot.sbatch
+      sbatch --export=expl=$expl,env=$env,bs=256,alg=9,policy_type=1,z_dim=128,K=1,var=1.0,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed,use_images=1 PPO_plot.sbatch
     done
   done
-  sleep 2400
+  sleep 18000
 done
 
 

@@ -27,6 +27,7 @@ python3 /Midgard/home/areichlin/GeometricRL/fetch/fetch_main.py \
              --n_actions ${n_a} \
               --conservative_weight ${c_wei} \
                --expectile ${expectile} \
-                --seed ${seed}
+                --seed ${seed} \
+                 --use_images ${use_images}
 
 

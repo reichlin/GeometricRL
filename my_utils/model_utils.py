@@ -158,9 +158,12 @@ class Policy(nn.Module):
 
     def get_mean(self, x, c=None):
 
-        if self.g_proj is not None:
-            c = self.g_proj(c)
-        h = torch.cat([x, c], -1)
+        if c is not None:
+            if self.g_proj is not None:
+                c = self.g_proj(c)
+            h = torch.cat([x, c], -1)
+        else:
+            h = x
 
         for layer in self.f:
             h = layer(h)
@@ -183,20 +186,30 @@ class Policy(nn.Module):
 
 class ActorCritic(nn.Module):
 
-    def __init__(self, input_dim, a_dim, a_max):
+    def __init__(self, input_dim, a_dim, a_max, init_layers, learn_var):
         super(ActorCritic, self).__init__()
 
+        self.learn_var = learn_var
         self.a_dim = a_dim
         self.a_max = a_max
         hidden_fc = 64
 
-        self.actor = nn.Sequential(nn.Linear(input_dim, hidden_fc),
-                                   nn.ReLU(),
-                                   nn.Linear(hidden_fc, hidden_fc),
-                                   nn.ReLU(),
-                                   nn.Linear(hidden_fc, hidden_fc),
-                                   nn.ReLU(),
-                                   nn.Linear(hidden_fc, a_dim * 2))
+        self.actor_head = nn.Sequential(nn.Linear(input_dim, hidden_fc),
+                                        nn.ReLU(),
+                                        nn.Linear(hidden_fc, hidden_fc),
+                                        nn.ReLU(),
+                                        nn.Linear(hidden_fc, hidden_fc),
+                                        nn.ReLU())
+        self.actor_mu = nn.Sequential(nn.Linear(hidden_fc, hidden_fc),
+                                      nn.ReLU(),
+                                      nn.Linear(hidden_fc, a_dim))
+        if learn_var:
+            self.actor_sigma = nn.Sequential(nn.Linear(hidden_fc, hidden_fc),
+                                             nn.ReLU(),
+                                             nn.Linear(hidden_fc, a_dim))
+        else:
+            self.var = nn.parameter.Parameter(torch.ones(1, a_dim) * 0.3, requires_grad=False).float()
+
         self.value = nn.Sequential(nn.Linear(input_dim, hidden_fc),
                                    nn.ReLU(),
                                    nn.Linear(hidden_fc, hidden_fc),
@@ -205,12 +218,29 @@ class ActorCritic(nn.Module):
                                    nn.ReLU(),
                                    nn.Linear(hidden_fc, 1))
 
+        #torch.nn.init.xavier_uniform_(self.actor_head.weight, gain=nn.init.calculate_gain('linear', self.film3.weight))
+        #nn.init.orthogonal_(w)
+
+        if init_layers:
+            torch.nn.init.orthogonal_(self.actor_head[0].weight)
+            torch.nn.init.orthogonal_(self.actor_head[2].weight)
+            torch.nn.init.orthogonal_(self.actor_head[4].weight)
+            torch.nn.init.orthogonal_(self.actor_mu[0].weight)
+            torch.nn.init.orthogonal_(self.actor_mu[2].weight)
+            # torch.nn.init.orthogonal_(self.actor_sigma[0].weight)
+            # torch.nn.init.orthogonal_(self.actor_sigma[2].weight)
+
     def forward(self, st):
 
-        policy = self.actor(st)
+        policy_h = self.actor_head(st)
         v = self.value(st)
-        mu = torch.tanh(policy[:, 0:self.a_dim]) * self.a_max
-        sigma = torch.sigmoid(policy[:, self.a_dim:2 * self.a_dim]) * 1 + 0.0001
+        mu = torch.tanh(self.actor_mu(policy_h)) * self.a_max
+        if self.learn_var:
+            sigma = torch.sigmoid(self.actor_sigma(policy_h)) * 1.0 + 0.0001
+        else:
+            sigma = self.var #torch.sigmoid(self.actor_sigma(policy_h)) * 1.0 + 0.0001
+        # mu = torch.tanh(policy[:, 0:self.a_dim]) * self.a_max
+        # sigma = torch.sigmoid(policy[:, self.a_dim:2 * self.a_dim]) * 1 + 0.0001
         v = v[:, -1]
 
         return mu, sigma, v
@@ -238,6 +268,44 @@ class ActorCritic(nn.Module):
         H = m.entropy()
 
         return logprob, v, H
+
+class Network_policy(nn.Module):
+
+    def __init__(self, state_dim, action_dim, device):
+        super(Network_policy, self).__init__()
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 256, bias=True),
+            nn.ReLU(),
+            nn.Linear(256, 256, bias=True),
+            nn.ReLU(),
+            nn.Linear(256, 256, bias=True),
+            nn.ReLU(),
+        )
+
+        self.policy_mean = nn.Sequential(
+            nn.Linear(256, action_dim, bias=True)
+        )
+
+        self.policy_var = nn.Sequential(
+            nn.Linear(256, action_dim, bias=True),
+            nn.Sigmoid(),
+        )
+
+        self.N = torch.distributions.normal.Normal(torch.zeros(action_dim).to(device), torch.ones(action_dim).to(device))
+
+    def get_action(self, s, greedy=False):
+        if greedy:
+            return torch.tanh(self.policy_mean(self.body(s))), None
+        h = self.body(s)
+        mean = self.policy_mean(h)
+        var = torch.clip(self.policy_var(h), 1e-10, 2.)
+        xi = self.N.sample()
+        u = mean + var * xi.detach()
+        a = torch.tanh(u)
+        # neg_log_pi = torch.sum(F.gaussian_nll_loss(mean, a, var, reduction='none'), -1) + torch.sum(torch.log(1 - torch.tanh(a)**2), -1)
+        log_pi = torch.sum(-torch.log(torch.clamp(var, 1e-6)), -1) - 0.5 * torch.sum(((u - mean) / var)**2, -1) - torch.sum(torch.log(1 - torch.tanh(u)**2), -1)
+        return a, log_pi
 
 
 class CNN(nn.Module):
