@@ -22,14 +22,14 @@ parser.add_argument('--seed', default=0, type=int)
 
 parser.add_argument('--environment', default=2, type=int)
 
-parser.add_argument('--r2', default=0.01, type=float)
+parser.add_argument('--r2', default=0.1, type=float)
 parser.add_argument('--c2', default=0.01, type=float)
 parser.add_argument('--K', default=10, type=int)
 parser.add_argument('--init_layer', default=0, type=int)
-parser.add_argument('--norm', default=1, type=int)
+parser.add_argument('--norm', default=0, type=int)
 parser.add_argument('--clip', default=0, type=int)
 parser.add_argument('--mini_batch', default=0, type=int)
-parser.add_argument('--learn_var', default=0, type=int)
+parser.add_argument('--learn_var', default=1, type=int)
 
 args = parser.parse_args()
 
@@ -55,7 +55,7 @@ input_dim, goal_dim, a_dim = environment_details["state_dim"], environment_detai
 env_dense = gym.make(environment_details["gym_name"], max_episode_steps=T)#, render_mode='human')
 env_sparse = gym.make(environment_details["sim_name"], max_episode_steps=T)
 
-writer = SummaryWriter("./logs_PPO/" + environment_details["name"] + "_r2="+str(r2)+"_c2="+str(c2)+"_K="+str(K) + "_all_tricks=" + str(specs) + "_pushing_point_plus_sparse_T=200")
+writer = SummaryWriter("./logs_PPO/" + environment_details["name"] + "_r2="+str(r2)+"_c2="+str(c2)+"_K="+str(K) + "_all_tricks=" + str(specs) + "_pushing_point_T=200_all_relative_bigger_max_var")
 
 
 agent = PPO(input_dim+goal_dim, a_dim, 1, device, c2=c2, K=K, specs=specs)
@@ -76,23 +76,26 @@ for epoch in tqdm(range(EPOCHS)):
             at, logprob, sigma = agent.get_action(current_state)
             next_obs, reward_to_goal, terminated, truncated, info = env_dense.step(at[0].detach().cpu().numpy())
 
-            training_reward = reward_to_goal
-            # training_reward = np.linalg.norm(obs['desired_goal'][:3] - obs['achieved_goal'][:3]) - \
-            #                   np.linalg.norm(next_obs['desired_goal'][:3] - next_obs['achieved_goal'][:3])
+            # training_reward = reward_to_goal
+            training_reward = -(np.linalg.norm(next_obs['desired_goal'][:3] - next_obs['achieved_goal'][:3]) - \
+                                np.linalg.norm(obs['desired_goal'][:3] - obs['achieved_goal'][:3]))
 
             #reward_get_obj = 0
             # if args.environment == 1 or args.environment == 2:
             #     if np.linalg.norm(next_obs['achieved_goal'] - next_obs['observation'][:3]) > 0.08:
             #         reward_get_obj = - r2 * np.linalg.norm(next_obs['achieved_goal'] - next_obs['observation'][:3])
 
+            p_goal_old = obs['desired_goal'][:3]
+            p_cube_old = obs['achieved_goal'][:3]
+            pushing_point_old = p_cube_old + ((p_cube_old - p_goal_old) / np.linalg.norm(p_cube_old - p_goal_old)) * 0.06
             p_goal = next_obs['desired_goal'][:3]
             p_cube = next_obs['achieved_goal'][:3]
             pushing_point = p_cube + ((p_cube - p_goal) / np.linalg.norm(p_cube - p_goal)) * 0.06
-            training_reward += - r2 * np.linalg.norm(pushing_point - next_obs['observation'][:3])
+            training_reward += - r2 * (np.linalg.norm(pushing_point - next_obs['observation'][:3]) - np.linalg.norm(pushing_point_old - obs['observation'][:3]))
 
             #training_reward += reward_get_obj
-            if np.linalg.norm(p_goal - p_cube) < 0.05:
-                training_reward += 1
+            # if np.linalg.norm(p_goal - p_cube) < 0.05:
+            #     training_reward += 1
             avg_distance_to_cube += np.linalg.norm(next_obs['achieved_goal'] - next_obs['observation'][:3])
             avg_distance_to_goal += - reward_to_goal
 
@@ -109,8 +112,8 @@ for epoch in tqdm(range(EPOCHS)):
 
     writer.add_scalar("Loss/v_loss", v_loss, epoch)
     writer.add_scalar("Loss/h_loss", h_loss, epoch)
-    writer.add_scalar("Rewards/distance_to_cube", avg_distance_to_cube/(n_trj*50), epoch)
-    writer.add_scalar("Rewards/distance_to_goal", avg_distance_to_goal/(n_trj*50), epoch)
+    writer.add_scalar("Rewards/distance_to_cube", avg_distance_to_cube/(n_trj*T), epoch)
+    writer.add_scalar("Rewards/distance_to_goal", avg_distance_to_goal/(n_trj*T), epoch)
 
     if epoch % 10 == 9:
         avg_reward = 0

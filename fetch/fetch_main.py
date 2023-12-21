@@ -88,7 +88,7 @@ exploration_strategy = args.exploration
 environment_details = experiments[args.environment]
 
 EPOCHS = 100
-batches_per_epoch = 50 #500
+batches_per_epoch = 500
 gamma = 0.95
 
 input_dim, goal_dim, a_dim = environment_details["state_dim"], environment_details["goal_dim"], environment_details["action_dim"]  # 4, 2, 2

@@ -236,7 +236,7 @@ class ActorCritic(nn.Module):
         v = self.value(st)
         mu = torch.tanh(self.actor_mu(policy_h)) * self.a_max
         if self.learn_var:
-            sigma = torch.sigmoid(self.actor_sigma(policy_h)) * 1.0 + 0.0001
+            sigma = torch.sigmoid(self.actor_sigma(policy_h)) * 10.0 + 0.0001 # TODO: change me
         else:
             sigma = self.var #torch.sigmoid(self.actor_sigma(policy_h)) * 1.0 + 0.0001
         # mu = torch.tanh(policy[:, 0:self.a_dim]) * self.a_max
