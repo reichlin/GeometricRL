@@ -44,7 +44,7 @@ env_sparse = gym.make(environment_details["sim_name"], max_episode_steps=200) #,
 
 reward = args.reward
 
-for reward in range(15, 200, 5): #range(1, 51):
+for reward in range(15, 200, 15): #range(1, 51):
     print(reward, end=" ")
 
     try:
@@ -70,10 +70,10 @@ for reward in range(15, 200, 5): #range(1, 51):
 
 
         obs, _ = env_sparse.reset()
-        for t in range(15, 200, 5):
+        for t in range(200):
             st = np.expand_dims(np.concatenate((obs['observation'], obs['desired_goal']), -1), 0)
 
-            at, logprob, sigma = agent.get_action(torch.from_numpy(st).float().to(device), test=True)  # TODO test=True ???
+            at, logprob, sigma = agent.get_action(torch.from_numpy(st).float().to(device), test=False)  # TODO test=True ???
             next_obs, reward_to_goal, terminated, truncated, info = env_sparse.step(at[0].detach().cpu().numpy())
 
             done = terminated or truncated
@@ -101,7 +101,7 @@ for reward in range(15, 200, 5): #range(1, 51):
             terminations = np.concatenate((terminations, np.concatenate(tmp_terminations, 0)), 0)
             next_states = np.concatenate((next_states, np.concatenate(tmp_next_states, 0)), 0)
 
-    file_name = "./datasets/" + environment_details["name"] + "/" + exp_name + ".npz"
+    file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
     np.savez(file_name, states, actions, rewards, terminations, next_states)
 
 
@@ -116,13 +116,13 @@ for reward in range(15, 200, 5): #range(1, 51):
 # plt.show()
 
 tot_rewards = []
-for reward in range(15, 200, 5):
+for reward in range(15, 200, 15):
     exp_name = "R=-"+str(reward)
-    file_name = "./datasets/" + environment_details["name"] + "/" + exp_name + ".npz"
+    file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
     filenpz = np.load(file_name)
     states, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4']
     tot_rewards.append(np.sum(rewards > -0.5)/100)
-plt.plot(range(15, 200, 5), tot_rewards)
+plt.plot(range(15, 200, 15), tot_rewards)
 plt.show()
 
 print()
