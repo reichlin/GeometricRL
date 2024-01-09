@@ -10,7 +10,8 @@ from torchvision.transforms import Resize, CenterCrop, Grayscale
 
 def simulation(model, sim, device, exp_id, environment_details, render=False, n_episodes=10, use_images=0, image_rescale=False):
     if render:
-        sim = gym.make(environment_details['gym_name'], continuing_task=False, render_mode='human') #max_episode_steps=max_T
+        # sim = gym.make(environment_details['gym_name'], continuing_task=False, render_mode='human') #max_episode_steps=max_T
+        sim = gym.make(environment_details['gym_name'], render_mode='human', max_episode_steps=200)
 
     total_sparse_reward = 0
     total_dense_reward = 0
@@ -45,7 +46,9 @@ def simulation(model, sim, device, exp_id, environment_details, render=False, n_
             next_obs, reward, terminated, truncated, info = sim.step(np.squeeze(current_action))
             #total_sparse_reward += reward
 
-            sparse_reward += reward #float(np.linalg.norm(next_obs['achieved_goal'] - next_obs['desired_goal']) <= 0.45)
+            # sparse_reward += reward #float(np.linalg.norm(next_obs['achieved_goal'] - next_obs['desired_goal']) <= 0.45)
+            solved = float(np.linalg.norm(next_obs['achieved_goal'] - next_obs['desired_goal']) <= 0.05)
+            sparse_reward += solved
 
             distance = np.linalg.norm(next_obs['achieved_goal'] - next_obs['desired_goal'], axis=-1)
             dense_reward += np.exp(-distance)
@@ -63,6 +66,8 @@ def simulation(model, sim, device, exp_id, environment_details, render=False, n_
                 else:
                     current_state = np.expand_dims(np.concatenate((obs['achieved_goal'], obs['observation'], obs['desired_goal']), -1), 0)
             if terminated or truncated:
+                break
+            if solved > 0:
                 break
 
         # max_score = environment_details["d4rl_scores"][1]
@@ -94,6 +99,12 @@ def train_loop(agent, dataloader, env, writer, exp_name, environment_details, EP
 
         if epoch % 1 == 0:
             agent.eval()
+
+            # v_img = visualize_values(agent, env, device)
+            # fig = plt.figure()
+            # plt.imshow(v_img)
+            # writer.add_figure("value function", fig, epoch)
+
             avg_sparse_reward, avg_dense_score = simulation(agent, env, device, args.environment, environment_details, render=False, n_episodes=100, use_images=use_images)
             writer.add_scalar("Rewards/sparse_reward", avg_sparse_reward, epoch)
             writer.add_scalar("Rewards/dense_score", avg_dense_score, epoch)
@@ -102,6 +113,29 @@ def train_loop(agent, dataloader, env, writer, exp_name, environment_details, EP
             dense_norm_reward_records.append(avg_dense_score)
             np.savez("./saved_results/" + environment_details["name"] + "_img=" + str(use_images) + "/" + exp_name + ".npz", np.array(sparse_reward_records), np.array(dense_norm_reward_records))
 
+
+def visualize_values(agent, env, device):
+
+    pz = 0.425
+    obj = np.array([1.25, 0.65, pz])
+    goal = np.array([1.45, 0.85, pz])
+    rest = np.zeros(16)
+
+    V = np.zeros((100, 100))
+    for i, x in enumerate(np.linspace(1.1, 1.6, 100)):
+        for j, y in enumerate(np.linspace(0.5, 1.0, 100)):
+
+            grip = np.array([x, y, pz])
+            delta = obj-grip
+
+            state = torch.from_numpy(np.concatenate((grip, obj, delta, rest), -1)).float().to(device)
+            # goal_state = torch.from_numpy(np.concatenate((goal+0.1, goal, np.ones(3)*0.1, rest), -1)).float().to(device)
+            goal_state = torch.from_numpy(goal).float().to(device)
+            value_xy = agent.get_value(state.view(1, -1), goal_state.view(1, -1)).detach().cpu().item()
+
+            V[i, j] = value_xy
+
+    return V
 
 def test_representation(env, exp_id, environment_details, agent, device, render=False):
 

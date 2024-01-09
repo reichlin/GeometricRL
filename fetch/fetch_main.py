@@ -42,14 +42,14 @@ parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--seed', default=0, type=int)
 
 ''' Dataset and Algorithm '''
-parser.add_argument('--exploration', default=1, type=int) # from 1 to 50
-parser.add_argument('--environment', default=0, type=int)
-parser.add_argument('--algorithm', default=9, type=int)
-parser.add_argument('--use_images', default=1, type=int)
+parser.add_argument('--exploration', default=34, type=int) # from 1 to 50
+parser.add_argument('--environment', default=2, type=int)
+parser.add_argument('--algorithm', default=0, type=int)
+parser.add_argument('--use_images', default=0, type=int)
 
 ''' GeometricRL HyperParameters '''
 parser.add_argument('--policy_type', default=1, type=int)  # -1: PHI, 0:DDPG, 1: REINFORCE, 2: PPO
-parser.add_argument('--z_dim', default=128, type=int)
+parser.add_argument('--z_dim', default=32, type=int)
 parser.add_argument('--K', default=5, type=int, help="number of PPO update steps")
 parser.add_argument('--var', default=1.0, type=float)
 parser.add_argument('--R_gamma', default=1.0, type=float)
@@ -88,7 +88,7 @@ exploration_strategy = args.exploration
 environment_details = experiments[args.environment]
 
 EPOCHS = 100
-batches_per_epoch = 500
+batches_per_epoch = 1000
 gamma = 0.95
 
 input_dim, goal_dim, a_dim = environment_details["state_dim"], environment_details["goal_dim"], environment_details["action_dim"]  # 4, 2, 2
@@ -125,103 +125,106 @@ algorithms = {0: 'GeometricRL',
               }
 
 
-for exploration_strategy in [1, 10, 20, 30, 40, 50]:
-    for algo_id in [0, 3, 4, 5, 7, 8, 9]:
+# for exploration_strategy in [1, 10, 20, 30, 40, 50]:
+#     for algo_id in [0, 3, 4, 5, 7, 8, 9]:
 
-        algo_name = algorithms[algo_id]
+algo_name = algorithms[algo_id]
 
-        exp_name = environment_details["name"] + "_R=-" + str(exploration_strategy)
-        exp_name += "_" + algo_name + "_BS=" + str(batch_size) + "_use_images=" + str(use_images)
-        if algo_name == 'GeometricRL':
-            exp_name += "_z_dim=" + str(z_dim) #"_policy_type=" + str(policy_type) + "_K=" + str(K)
-            exp_name += "_reg=" + str(reg) #"_R_gamma=" + str(R_gamma) + "_pi_clip=" + str(pi_clip)
-        else:
-            exp_name += "_baselines_hyper=" + str(baseline_hyper)
+exp_name = environment_details["name"] + "_R=-" + str(exploration_strategy)
+exp_name += "_" + algo_name + "_BS=" + str(batch_size) + "_use_images=" + str(use_images)
+if algo_name == 'GeometricRL':
+    exp_name += "_z_dim=" + str(z_dim) #"_policy_type=" + str(policy_type) + "_K=" + str(K)
+    exp_name += "_reg=" + str(reg) #"_R_gamma=" + str(R_gamma) + "_pi_clip=" + str(pi_clip)
+else:
+    exp_name += "_baselines_hyper=" + str(baseline_hyper)
 
-        exp_name += "_seed=" + str(seed)
+exp_name += "_seed=" + str(seed)
 
-        writer = SummaryWriter("./logs/" + exp_name)
+writer = SummaryWriter("./logs/" + exp_name)
 
-        ''' Dataset and simulator '''
-        if use_images == 1:
-            env = gym.make(environment_details["sim_name"], render_mode='rgb_array')
-        else:
-            env = gym.make(environment_details["sim_name"])
+''' Dataset and simulator '''
+if use_images == 1:
+    env = gym.make(environment_details["sim_name"], render_mode='rgb_array')
+else:
+    env = gym.make(environment_details["sim_name"], max_episode_steps=200)
 
-        file_name = "./datasets_var/" + environment_details["name"] + "/" + "R=-" + str(exploration_strategy) + ".npz"
-        filenpz = np.load(file_name)
-        states, images, images_goal, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4'], filenpz['arr_5'], filenpz['arr_6']
+file_name = "./datasets_var/" + environment_details["name"] + "/" + "R=-" + str(exploration_strategy) + ".npz"
+filenpz = np.load(file_name)
+# states, images, images_goal, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4'], filenpz['arr_5'], filenpz['arr_6']
+states, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4']
+images = None
+images_goal = None
 
-        if algo_id == 0 or algo_id == 10:
-            dataset = Dataset_Uniform_precollected(states, actions, rewards, terminations, next_states, device, batches_per_epoch*batch_size, input_dim, images=images, images_goal=images_goal)
-            dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        elif algo_id == 9:
-            dataset = Dataset_Visitation((states, actions, rewards, terminations, next_states), None, device, batches_per_epoch * batch_size, gamma, obs_shape=input_dim, images=images, images_goal=images_goal)
-            dataloader = DataLoader(dataset, batch_size=batch_size)
-        else:
-            if use_images == 0:
-                dataset = d3rlpy.dataset.MDPDataset(states, actions, rewards, terminations)
-            else:
-                dataset = d3rlpy.dataset.MDPDataset(images.astype(np.uint8), actions, rewards, terminations)
-            dataloader = None
-
-
-        ''' Algorithm '''
-        if algo_name == 'GeometricRL':
-            algo_class = None
-            agent = GeometricRL(input_dim,
-                                goal_dim,
-                                z_dim,
-                                a_dim,
-                                gamma,
-                                network_def=network_def,
-                                K=K,
-                                var=var,
-                                R_gamma=R_gamma,
-                                reg=reg,
-                                policy_type=policy_type,
-                                policy_clip=pi_clip,
-                                device=device,
-                                use_images=use_images).to(device)
-
-            train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type, use_images=use_images)
-
-        # elif algo_name == 'QuasiMetric':
-        #     algo_class = None
-        #     agent = QuasiMetric(input_dim, goal_dim, z_dim, a_dim, R_gamma, network_def, var, device).to(device)
-        #
-        #     train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type)
-
-        elif algo_name == 'ContrastiveRL':
-            algo_class = None
-            offline_reg = 0.05
-            agent = ContrastiveRL(input_dim, goal_dim, z_dim, a_dim, network_def, var, offline_reg, device, use_images=use_images).to(device)
-
-            train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type, use_images=use_images)
-
-        else:
-            algo_class, agent = get_algo(algo_name, gamma, batch_size, device_flag, network_def, baseline_hyper, use_images=use_images)
-            sparse_reward_records = []
-            dense_norm_reward_records = []
-
-            def callback(algo: algo_class, epoch: int, total_step: int) -> None:  # d3rlpy.algos.QLearningAlgoBase
-                avg_sparse_reward, avg_dense_score = simulation(agent, env, device, args.environment, environment_details, render=False, n_episodes=100, use_images=use_images, image_rescale=True if use_images == 1 else False)
-                writer.add_scalar("Rewards/sparse_reward", avg_sparse_reward, epoch-1)
-                writer.add_scalar("Rewards/dense_score", avg_dense_score, epoch-1)
-                sparse_reward_records.append(avg_sparse_reward)
-                dense_norm_reward_records.append(avg_dense_score)
-                np.savez("./saved_results/" + environment_details["name"] + "_img=" + str(use_images) + "/" + exp_name + ".npz", np.array(sparse_reward_records), np.array(dense_norm_reward_records))
-
-            agent.fit(dataset,
-                      n_steps=batches_per_epoch*EPOCHS,
-                      n_steps_per_epoch=batches_per_epoch,
-                      experiment_name=None,
-                      save_interval=batches_per_epoch*EPOCHS+1,
-                      epoch_callback=callback,
-                      )
+if algo_id == 0 or algo_id == 10:
+    dataset = Dataset_Uniform_precollected(states, actions, rewards, terminations, next_states, device, batches_per_epoch*batch_size, input_dim, images=images, images_goal=images_goal)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+elif algo_id == 9:
+    dataset = Dataset_Visitation((states, actions, rewards, terminations, next_states), None, device, batches_per_epoch * batch_size, gamma, obs_shape=input_dim, images=images, images_goal=images_goal)
+    dataloader = DataLoader(dataset, batch_size=batch_size)
+else:
+    if use_images == 0:
+        dataset = d3rlpy.dataset.MDPDataset(states, actions, rewards, terminations)
+    else:
+        dataset = d3rlpy.dataset.MDPDataset(images.astype(np.uint8), actions, rewards, terminations)
+    dataloader = None
 
 
-        writer.close()
+''' Algorithm '''
+if algo_name == 'GeometricRL':
+    algo_class = None
+    agent = GeometricRL(input_dim,
+                        goal_dim,
+                        z_dim,
+                        a_dim,
+                        gamma,
+                        network_def=network_def,
+                        K=K,
+                        var=var,
+                        R_gamma=R_gamma,
+                        reg=reg,
+                        policy_type=policy_type,
+                        policy_clip=pi_clip,
+                        device=device,
+                        use_images=use_images).to(device)
+
+    train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type, use_images=use_images)
+
+# elif algo_name == 'QuasiMetric':
+#     algo_class = None
+#     agent = QuasiMetric(input_dim, goal_dim, z_dim, a_dim, R_gamma, network_def, var, device).to(device)
+#
+#     train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type)
+
+elif algo_name == 'ContrastiveRL':
+    algo_class = None
+    offline_reg = 0.05
+    agent = ContrastiveRL(input_dim, goal_dim, z_dim, a_dim, network_def, var, offline_reg, device, use_images=use_images).to(device)
+
+    train_loop(agent, dataloader, env, writer, exp_name, environment_details, EPOCHS, args, device, policy_type, use_images=use_images)
+
+else:
+    algo_class, agent = get_algo(algo_name, gamma, batch_size, device_flag, network_def, baseline_hyper, use_images=use_images)
+    sparse_reward_records = []
+    dense_norm_reward_records = []
+
+    def callback(algo: algo_class, epoch: int, total_step: int) -> None:  # d3rlpy.algos.QLearningAlgoBase
+        avg_sparse_reward, avg_dense_score = simulation(agent, env, device, args.environment, environment_details, render=False, n_episodes=100, use_images=use_images, image_rescale=True if use_images == 1 else False)
+        writer.add_scalar("Rewards/sparse_reward", avg_sparse_reward, epoch-1)
+        writer.add_scalar("Rewards/dense_score", avg_dense_score, epoch-1)
+        sparse_reward_records.append(avg_sparse_reward)
+        dense_norm_reward_records.append(avg_dense_score)
+        np.savez("./saved_results/" + environment_details["name"] + "_img=" + str(use_images) + "/" + exp_name + ".npz", np.array(sparse_reward_records), np.array(dense_norm_reward_records))
+
+    agent.fit(dataset,
+              n_steps=batches_per_epoch*EPOCHS,
+              n_steps_per_epoch=batches_per_epoch,
+              experiment_name=None,
+              save_interval=batches_per_epoch*EPOCHS+1,
+              epoch_callback=callback,
+              )
+
+
+writer.close()
 
 
 

@@ -61,8 +61,8 @@ class Dataset_Uniform_precollected(Dataset):
         idx = np.random.randint(0, self.len)
 
         s = self.states[idx]#.to(self.device)
-        o = self.images[idx] if self.images is not None else None
-        og = self.images_goal[idx] if self.images_goal is not None else None
+        o = self.images[idx] if self.images is not None else self.states[idx]*0
+        og = self.images_goal[idx] if self.images_goal is not None else self.states[idx]*0
         g = self.goals[idx]#.to(self.device)
         a = self.actions[idx]#.to(self.device)
         r = self.rewards[idx]#.to(self.device)
@@ -70,9 +70,9 @@ class Dataset_Uniform_precollected(Dataset):
         s1 = self.next_states[idx]#.to(self.device)
 
         if term == 0:
-            o1 = self.images[idx + 1] if self.images is not None else None
+            o1 = self.images[idx + 1] if self.images is not None else self.states[idx]*0
         else:
-            o1 = self.images[idx] if self.images is not None else None
+            o1 = self.images[idx] if self.images is not None else self.states[idx]*0
 
         return s, g, a, r, term, s1, o, og, o1
 
@@ -230,8 +230,8 @@ class Dataset_Visitation(Dataset):
         i = np.random.randint(0, len_trj-t)
 
         s = self.states[trj_i][i]
-        o = self.images[trj_i][i] if self.images is not None else None
-        og = self.images_goal[trj_i][i] if self.images_goal is not None else None
+        o = self.images[trj_i][i] if self.images is not None else self.states[trj_i][i]*0
+        og = self.images_goal[trj_i][i] if self.images_goal is not None else self.states[trj_i][i]*0
         g = self.goals[trj_i][i]
         a = self.actions[trj_i][i]
         r = self.rewards[trj_i][i]
@@ -239,9 +239,9 @@ class Dataset_Visitation(Dataset):
         s1 = self.next_states[trj_i][i+t]
 
         if term == 0:
-            o1 = self.images[trj_i][i+t] if self.images is not None else None
+            o1 = self.images[trj_i][i+t] if self.images is not None else self.states[trj_i][i]*0
         else:
-            o1 = self.images[trj_i][i] if self.images is not None else None
+            o1 = self.images[trj_i][i] if self.images is not None else self.states[trj_i][i]*0
 
         return s, g, a, r, term, s1, o, og, o1
 

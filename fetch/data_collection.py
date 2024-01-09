@@ -43,66 +43,71 @@ env_sparse = gym.make(environment_details["sim_name"], max_episode_steps=200) #,
 #agent = PPO(input_dim+goal_dim, a_dim, 1, device)
 
 reward = args.reward
+available_rewards = []
+T = 200
+N_TRJ = 1000
 
-for reward in range(15, 200, 15): #range(1, 51):
-    print(reward, end=" ")
+# for reward in range(31, T+1): #range(1, 51):
+#     print(reward)
+#
+#     # try:
+#     #     specs = {'init_layer': False, 'norm': False, 'clip': False, 'mini_batch': False, 'learn_var': True}
+#     #     agent = PPO(input_dim + goal_dim, a_dim, 1, device, c2=0.0, K=10, specs=specs)
+#     #     reward_achieved = "-"+str(reward)
+#     #     path_dir = "./saved_PPOs/" + environment_details["name"] + "/"
+#     #     exp_name = "R=" + reward_achieved
+#     #     agent.load_model(path_dir, exp_name)
+try:
+    specs = {'init_layer': False, 'norm': False, 'clip': False, 'mini_batch': False, 'learn_var': False}
+    agent = PPO(input_dim + goal_dim, a_dim, 1, device, c2=0.0, K=10, specs=specs)
+    reward_achieved = "-" + str(reward)
+    path_dir = "./saved_PPOs/" + environment_details["name"] + "/"
+    exp_name = "R=" + reward_achieved
+    agent.load_model(path_dir, exp_name)
+except:
+    exit() # TODO: continue
 
-    try:
-        specs = {'init_layer': False, 'norm': False, 'clip': False, 'mini_batch': False, 'learn_var': True}
-        agent = PPO(input_dim + goal_dim, a_dim, 1, device, c2=0.0, K=10, specs=specs)
-        reward_achieved = "-"+str(reward)
-        path_dir = "./saved_PPOs/" + environment_details["name"] + "/"
-        exp_name = "R=" + reward_achieved
-        agent.load_model(path_dir, exp_name)
-    except:
-        specs = {'init_layer': False, 'norm': False, 'clip': False, 'mini_batch': False, 'learn_var': False}
-        agent = PPO(input_dim + goal_dim, a_dim, 1, device, c2=0.0, K=10, specs=specs)
-        reward_achieved = "-" + str(reward)
-        path_dir = "./saved_PPOs/" + environment_details["name"] + "/"
-        exp_name = "R=" + reward_achieved
-        agent.load_model(path_dir, exp_name)
+available_rewards.append(reward)
 
-    EPOCHS = 100
-
-    states, actions, rewards, terminations, next_states = None, None, None, None, None
-    for epoch in tqdm(range(EPOCHS)):
-        tmp_states, tmp_actions, tmp_rewards, tmp_terminations, tmp_next_states = [], [], [], [], []
+states, actions, rewards, terminations, next_states = None, None, None, None, None
+for epoch in tqdm(range(N_TRJ)):
+    tmp_states, tmp_actions, tmp_rewards, tmp_terminations, tmp_next_states = [], [], [], [], []
 
 
-        obs, _ = env_sparse.reset()
-        for t in range(200):
-            st = np.expand_dims(np.concatenate((obs['observation'], obs['desired_goal']), -1), 0)
+    obs, _ = env_sparse.reset()
+    for t in range(T):
+        st = np.expand_dims(np.concatenate((obs['observation'], obs['desired_goal']), -1), 0)
 
-            at, logprob, sigma = agent.get_action(torch.from_numpy(st).float().to(device), test=False)  # TODO test=True ???
-            next_obs, reward_to_goal, terminated, truncated, info = env_sparse.step(at[0].detach().cpu().numpy())
+        at, logprob, sigma = agent.get_action(torch.from_numpy(st).float().to(device), test=False)  # TODO test=True ???
+        next_obs, reward_to_goal, terminated, truncated, info = env_sparse.step(at[0].detach().cpu().numpy())
 
-            done = terminated or truncated
+        done = terminated or truncated
 
-            tmp_states.append(st)
-            tmp_actions.append(at.detach().cpu().numpy())
-            tmp_rewards.append(np.array([[reward_to_goal]]))
-            tmp_terminations.append(np.array([[done * 1.]]))
-            tmp_next_states.append(np.expand_dims(np.concatenate((next_obs['observation'], next_obs['desired_goal']), -1), 0))
+        tmp_states.append(st)
+        tmp_actions.append(at.detach().cpu().numpy())
+        tmp_rewards.append(np.array([[reward_to_goal]]))
+        tmp_terminations.append(np.array([[done * 1.]]))
+        tmp_next_states.append(np.expand_dims(np.concatenate((next_obs['observation'], next_obs['desired_goal']), -1), 0))
 
-            obs = next_obs
+        obs = next_obs
 
-        tmp_terminations[-1][0, 0] = 1
+    tmp_terminations[-1][0, 0] = 1
 
-        if states is None:
-            states = np.concatenate(tmp_states, 0)
-            actions = np.concatenate(tmp_actions, 0)
-            rewards = np.concatenate(tmp_rewards, 0)
-            terminations = np.concatenate(tmp_terminations, 0)
-            next_states = np.concatenate(tmp_next_states, 0)
-        else:
-            states = np.concatenate((states, np.concatenate(tmp_states, 0)), 0)
-            actions = np.concatenate((actions, np.concatenate(tmp_actions, 0)), 0)
-            rewards = np.concatenate((rewards, np.concatenate(tmp_rewards, 0)), 0)
-            terminations = np.concatenate((terminations, np.concatenate(tmp_terminations, 0)), 0)
-            next_states = np.concatenate((next_states, np.concatenate(tmp_next_states, 0)), 0)
+    if states is None:
+        states = np.concatenate(tmp_states, 0)
+        actions = np.concatenate(tmp_actions, 0)
+        rewards = np.concatenate(tmp_rewards, 0)
+        terminations = np.concatenate(tmp_terminations, 0)
+        next_states = np.concatenate(tmp_next_states, 0)
+    else:
+        states = np.concatenate((states, np.concatenate(tmp_states, 0)), 0)
+        actions = np.concatenate((actions, np.concatenate(tmp_actions, 0)), 0)
+        rewards = np.concatenate((rewards, np.concatenate(tmp_rewards, 0)), 0)
+        terminations = np.concatenate((terminations, np.concatenate(tmp_terminations, 0)), 0)
+        next_states = np.concatenate((next_states, np.concatenate(tmp_next_states, 0)), 0)
 
-    file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
-    np.savez(file_name, states, actions, rewards, terminations, next_states)
+file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
+np.savez(file_name, states, actions, rewards, terminations, next_states)
 
 
 # tot_rewards = []
@@ -115,17 +120,18 @@ for reward in range(15, 200, 15): #range(1, 51):
 # plt.plot(range(1, 51), tot_rewards)
 # plt.show()
 
-tot_rewards = []
-for reward in range(15, 200, 15):
-    exp_name = "R=-"+str(reward)
-    file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
-    filenpz = np.load(file_name)
-    states, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4']
-    tot_rewards.append(np.sum(rewards > -0.5)/100)
-plt.plot(range(15, 200, 15), tot_rewards)
-plt.show()
-
-print()
+# tot_rewards = []
+# for reward in available_rewards: #range(15, 200, 15):
+#     exp_name = "R=-"+str(reward)
+#     file_name = "./datasets_var/" + environment_details["name"] + "/" + exp_name + ".npz"
+#     filenpz = np.load(file_name)
+#     states, actions, rewards, terminations, next_states = filenpz['arr_0'], filenpz['arr_1'], filenpz['arr_2'], filenpz['arr_3'], filenpz['arr_4']
+#     tot_rewards.append(np.sum(rewards > -0.5)/N_TRJ)
+# #plt.plot(range(15, 200, 15), tot_rewards)
+# plt.plot(available_rewards, tot_rewards)
+# plt.show()
+#
+# print()
 
 #
 # env_sparse = gym.make(environment_details["sim_name"], render_mode='rgb_array', max_episode_steps=104) #, render_mode='human')

@@ -11,6 +11,9 @@ class GeometricRL(nn.Module):
     def __init__(self, dim_input, dim_goal, dim_z, dim_a, gamma, memory_size=0, all_actions_idx=None, all_actions=None, network_def=None, K=2, var=0.1, R_gamma=1., reg=1.0, policy_type=0, policy_clip=None, device=None, use_images=0):
         super().__init__()
 
+
+        self.fetch_push = True
+
         self.replay_buffer = Memory(memory_size)
         self.all_actions_idx = all_actions_idx
         self.all_actions = all_actions
@@ -87,7 +90,19 @@ class GeometricRL(nn.Module):
         #goal = torch.cat([s_g, s[:, s_g.shape[1]:]], -1)
         # goal = s_g.repeat(1, 2)
         # goal[:, 2:] *= 0
-        if self.use_images == 0:
+
+        if self.fetch_push:
+            # goal = s * 0
+            # goal[:, :3] = s_g
+            # goal[:, 3] += 0.3
+            # goal[:, 3:6] = s_g
+            # goal[:, 6:8] = 0
+            # goal[:, 8] = 0.3
+            goal = s * 0
+            goal[:, :3] = s_g+0.2
+            goal[:, 3:6] = s_g
+            goal[:, 6:9] = 0.2
+        elif self.use_images == 0:
             goal = s * 0
             goal[:, :s_g.shape[-1]] = s_g
         else:
