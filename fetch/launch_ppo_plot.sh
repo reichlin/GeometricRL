@@ -5,14 +5,14 @@
 for expl in 34 50 78 100 126 145 176 195; do # TODO: 1 5 10 15 20 25 30 35 40 45 50
   for seed in 0 1 2; do #  1 2
     for env in 2; do
-#      # GeometricRL
-#      for z_dim in 32 128 512; do
-#        for reg in 1.0; do
-#          for batch_size in 256; do
-#            sbatch --export=expl=$expl,env=$env,alg=0,bs=$batch_size,policy_type=1,z_dim=$z_dim,K=1,var=1.0,R_gamma=1.0,reg=$reg,pi_clip=-1,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed,use_images=0  PPO_plot.sbatch
-#          done
-#        done
-#      done
+      # GeometricRL
+      for z_dim in 32 128 512; do
+        for reg in 1.0; do
+          for batch_size in 256; do
+            sbatch --export=expl=$expl,env=$env,alg=0,bs=$batch_size,policy_type=1,z_dim=$z_dim,K=1,var=1.0,R_gamma=1.0,reg=$reg,pi_clip=-1,n_c=1,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed,use_images=0  PPO_plot.sbatch
+          done
+        done
+      done
       # DDPG
       for n_c in 2; do
         sbatch --export=expl=$expl,env=$env,bs=256,alg=1,policy_type=1,z_dim=128,K=1,var=0.1,R_gamma=1.0,reg=1.0,pi_clip=-1.0,n_c=$n_c,n_a=1,c_wei=10.0,expectile=0.9,seed=$seed,use_images=0  PPO_plot.sbatch
